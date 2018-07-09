@@ -10,7 +10,6 @@ The results come out in graphs and in the terminal, It shows you the difference 
 
 Each of the 22 benchmarking queries is executed 5 times.
 
-There is also a loop implemented, incase there is no new commit, the script will sleep for 5 mins, check if there is a new commit, if not sleep again, if yes , updates to the new commit and runs the benchmarking process. This loop is added as a comment for the moment, for speed testing reasons.
+There is also a loop implemented, incase there is no new commit, the script will sleep for 3 minutes, check if there is a new commit, if not sleep again, if yes , updates to the new commit and runs the benchmarking process. 
 
-Version 0.1, first commit. Updates are to follow.
 Cheerio.
