@@ -7,12 +7,16 @@ import getpass
 import os
 import time
 import subprocess
+import math
 
 from os.path import expanduser
 from operator import sub
+from numpy import prod 
 
 Uservar=getpass.getuser()
 home=expanduser("~")
+
+os.system("pip install psycopg2 --user")
 
 DirvarTpch=raw_input("Greetings! Please type the name of the directory that you want to save TPCH: ")
 
@@ -35,7 +39,7 @@ os.system("git clone https://github.com/2ndQuadrant/pg-tpch")
 os.chdir("pg-tpch")
 os.chdir("dbgen")
 os.system("make")
-Scalefactor=raw_input("Please type the scale factor number you would like for tpch : ")
+Scalefactor=input("Please type the scale factor number you would like for tpch : ")
 os.system("./dbgen -s %s" %Scalefactor)
 os.system("for i in `ls *.tbl`; do sed 's/|$//' $i > ${i/tbl/csv}; echo $i; done;")
         
@@ -69,21 +73,31 @@ if os.path.exists(os.path.join(home,Dirvar))==True:
         cur=conn.cursor()
 
         cur.execute("""Create table nation (n_nationkey integer, n_name text, n_regionkey integer, n_comment text)""")
+        cur.execute("""Create index GRulez0 on nation (n_nationkey);""")
 
         cur.execute("""Create table supplier (s_suppkey integer, s_name text, s_address text, s_nationkey integer, s_phone text, s_acctbal decimal, s_comment text)""")
+        cur.execute("""Create index GRulez1 on supplier (s_suppkey);""")
 
         cur.execute("""Create table region (r_regionkey integer, r_name text, r_comment text)""")
+        cur.execute("""Create index GRulez2 on region (r_regionkey);""")
 
-        cur.execute( """Create table customer (c_custkey integer,c_name text, c_address text, c_nationkey integer, c_phone text, c_acctbal decimal, c_mktsegment text, c_comment text)""")
+        cur.execute("""Create table customer (c_custkey integer,c_name text, c_address text, c_nationkey integer, c_phone text, c_acctbal decimal, c_mktsegment text, c_comment text)""")
+        cur.execute("""Create index Grulez3 on customer (c_custkey);""")
 
         cur.execute("""Create table orders (o_orderkey integer, o_custkey integer, o_orderstatus text,o_totalprice decimal, o_orderdate date, o_orderpriority text, o_shippriority text, o_comment text, extracol text)""")
+        cur.execute("""Create index Grulez4 on orders (o_orderkey);""")
 
         cur.execute(""" Create table part(p_partkey integer, p_name text, p_mfgr text, p_brand text, p_type text, p_size integer, p_container text, p_retailprice decimal, p_comment text)""")
+        cur.execute("""Create index GRulez5 on part (p_partkey);""")
 
         cur.execute("""Create table partsupp (ps_partkey integer, ps_suppkey integer, ps_availqty integer, ps_supplycost decimal, ps_comment text)""")
+        cur.execute("""Create index GRulez6 on partsupp (ps_partkey);""")
 
-        cur.execute("""Create table lineitem (l_orderkey integer, l_partkey integer, l_suppkey integer, l_linenumber integer, l_quantity real, l_extendedprice decimal, l_discount decimal, l_tax decimal,l_returnflag text, l_linestatus text, l_shipdate date, l_commitdate date, l_receiptdate date, l_shipinstruct text, l_shipmode text, l_comment text)""")
+        cur.execute("""Create table lineitem (l_orderkey integer, l_partkey integer, l_suppkey integer, l_linenumber integer, l_quantity decimal, l_extendedprice decimal, l_discount decimal, l_tax decimal,l_returnflag text, l_linestatus text, l_shipdate date, l_commitdate date, l_receiptdate date, l_shipinstruct text, l_shipmode text, l_comment text)""")
+        cur.execute("""Create index GRulez7 on lineitem (l_partkey);""")
+
         startloading1=time.time()
+
         cur.execute("""Copy customer from '%s' (format csv, delimiter ('|'));""" % pathcustomer)
 
         cur.execute("""Copy lineitem from '%s' (format csv, delimiter ('|'));""" % pathlineitem)
@@ -524,20 +538,28 @@ if os.path.exists(os.path.join(home,Dirvar))==True:
 #---------------------UPDATE TRY---------------------------------
 
     os.chdir(pathupdatecommit)
-    print "Current commit version is : "
-    ComValue1=os.system("git rev-parse HEAD")
+    ComValue1=os.popen("git rev-parse HEAD").read()
+    print ("Current commit version is  : %s" %ComValue1)
     print "Updating to the new commit of Postgresql.."
     os.system("git pull https://github.com/postgres/postgres")
     print "--------------------------------------------------"
-    print "Current commit version is : "
-    ComValue2=os.system("git rev-parse HEAD")
-    #while ComValue1==ComValue2:
-        #print ("There is no new commit available, waiting for ? mins..")
-        #os.system("sleep 3m")
-        #os.system("git pull https://github.com/postgres/postgres")
-        #ComValue2=os.system("git rev-parse")
+    ComValue2=os.popen("git rev-parse HEAD").read()
+    
+    while ComValue1==ComValue2:
+        print ("There is no new commit available, waiting for 3 minutes..")
+        os.system("sleep 3m")
+        os.system("git pull https://github.com/postgres/postgres")
+        ComValue2=os.popen("git rev-parse HEAD").read()
+
+
+
+    print ("The updated commit version is : %s" %ComValue2)
+    print "Installing the new version of PostgreSQL..."
+    os.system("make -j -s")
+    os.system("make install -j -s")
     pathpostupdate=os.path.join(home,Dirvar,'bin')
     os.chdir(pathpostupdate)
+
     print "Dropping the tables and reloading them..."
     cur.execute("""Drop table nation;""")
     cur.execute("""Drop table supplier;""")
@@ -549,21 +571,32 @@ if os.path.exists(os.path.join(home,Dirvar))==True:
     cur.execute("""Drop table lineitem;""")
     
     cur.execute("""Create table nation (n_nationkey integer, n_name text, n_regionkey integer, n_comment text)""")
+    cur.execute("""Create index GRulez0 on nation (n_nationkey);""")
 
     cur.execute("""Create table supplier (s_suppkey integer, s_name text, s_address text, s_nationkey integer, s_phone text, s_acctbal decimal, s_comment text)""")
+    cur.execute("""Create index GRulez1 on supplier (s_suppkey);""")
 
     cur.execute("""Create table region (r_regionkey integer, r_name text, r_comment text)""")
+    cur.execute("""Create index GRulez2 on region (r_regionkey);""")
 
-    cur.execute( """Create table customer (c_custkey integer,c_name text, c_address text, c_nationkey integer, c_phone text, c_acctbal decimal, c_mktsegment text, c_comment text)""")
+    cur.execute("""Create table customer (c_custkey integer,c_name text, c_address text, c_nationkey integer, c_phone text, c_acctbal decimal, c_mktsegment text, c_comment text)""")
+    cur.execute("""Create index Grulez3 on customer (c_custkey);""")
 
     cur.execute("""Create table orders (o_orderkey integer, o_custkey integer, o_orderstatus text,o_totalprice decimal, o_orderdate date, o_orderpriority text, o_shippriority text, o_comment text, extracol text)""")
+    cur.execute("""Create index Grulez4 on orders (o_orderkey);""")
 
     cur.execute(""" Create table part(p_partkey integer, p_name text, p_mfgr text, p_brand text, p_type text, p_size integer, p_container text, p_retailprice decimal, p_comment text)""")
+    cur.execute("""Create index GRulez5 on part (p_partkey);""")
 
     cur.execute("""Create table partsupp (ps_partkey integer, ps_suppkey integer, ps_availqty integer, ps_supplycost decimal, ps_comment text)""")
+    cur.execute("""Create index GRulez6 on partsupp (ps_partkey);""")
 
-    cur.execute("""Create table lineitem (l_orderkey integer, l_partkey integer, l_suppkey integer, l_linenumber integer, l_quantity real, l_extendedprice decimal, l_discount decimal, l_tax decimal,l_returnflag text, l_linestatus text, l_shipdate date, l_commitdate date, l_receiptdate date, l_shipinstruct text, l_shipmode text, l_comment text)""")
+    cur.execute("""Create table lineitem (l_orderkey integer, l_partkey integer, l_suppkey integer, l_linenumber integer, l_quantity decimal, l_extendedprice decimal, l_discount decimal, l_tax decimal,l_returnflag text, l_linestatus text, l_shipdate date, l_commitdate date, l_receiptdate date, l_shipinstruct text, l_shipmode text, l_comment text)""")
+    cur.execute("""Create index GRulez7 on lineitem (l_partkey);""")
+
+    
     startloading2=time.time()
+    
     cur.execute("""Copy customer from '%s' (format csv, delimiter ('|'));""" % pathcustomer)
 
     cur.execute("""Copy lineitem from '%s' (format csv, delimiter ('|'));""" % pathlineitem)
@@ -896,12 +929,12 @@ if os.path.exists(os.path.join(home,Dirvar))==True:
 
     run_times17b=[]
     for i in range(1,num_times):
-            start17b=time.time()
-            cur.execute("""Select sum(l_extendedprice) / 7.0 as avg_yearly from lineitem, part where p_partkey=l_partkey and p_brand='Brand#23' and p_container='MED BOX' and l_quantity < (Select 0.2 * avg(l_quantity) from lineitem where l_partkey=p_partkey);""")
-            end17b=time.time()
-            q17b=end17b-start17b
-            run_times17b.append(q17b)
-            print ("Elapsed time for the %d run of the 17th query is %s seconds" %(i,q17b))
+        start17b=time.time()
+        cur.execute("""Select sum(l_extendedprice) / 7.0 as avg_yearly from lineitem, part where p_partkey=l_partkey and p_brand='Brand#23' and p_container='MED BOX' and l_quantity < (Select 0.2 * avg(l_quantity) from lineitem where l_partkey=p_partkey);""")
+        end17b=time.time()
+        q17b=end17b-start17b
+        run_times17b.append(q17b)
+        print ("Elapsed time for the %d run of the 17th query is %s seconds" %(i,q17b))
 
     q17_coldb=run_times17b[0]
     q17_min_hotb=min(run_times17b[1:])
@@ -1028,8 +1061,8 @@ else:
     os.chdir("postgres")
     PREFIX=os.path.join(home,Dirvar)
     os.system("./configure --prefix=%s" % PREFIX)
-    os.system("make")
-    os.system("make install")
+    os.system("make -j -s")
+    os.system("make install -j -s")
     os.chdir(home)
     os.chdir(Dirvar)
     os.chdir("bin")
@@ -1049,18 +1082,34 @@ else:
  
     cur=conn.cursor()
     cur.execute("""Create table nation (n_nationkey integer, n_name text, n_regionkey integer, n_comment text)""")
-    cur.execute("""Create table supplier (s_suppkey integer, s_name text, s_address text, s_nationkey integer, s_phone text, s_acctbal decimal, s_comment text)""")
-    cur.execute("""Create table region (r_regionkey integer, r_name text, r_comment text)""")
+    cur.execute("""Create index GRulez0 on nation (n_nationkey);""")
 
-    cur.execute( """Create table customer (c_custkey integer,c_name text, c_address text, c_nationkey integer, c_phone text, c_acctbal decimal, c_mktsegment text, c_comment text)""")
+    cur.execute("""Create table supplier (s_suppkey integer, s_name text, s_address text, s_nationkey integer, s_phone text, s_acctbal decimal, s_comment text)""")
+    cur.execute("""Create index GRulez1 on supplier (s_suppkey);""")
+
+    cur.execute("""Create table region (r_regionkey integer, r_name text, r_comment text)""")
+    cur.execute("""Create index GRulez2 on region (r_regionkey);""")
+
+    cur.execute("""Create table customer (c_custkey integer,c_name text, c_address text, c_nationkey integer, c_phone text, c_acctbal decimal, c_mktsegment text, c_comment text)""")
+    cur.execute("""Create index Grulez3 on customer (c_custkey);""")
+
     cur.execute("""Create table orders (o_orderkey integer, o_custkey integer, o_orderstatus text,o_totalprice decimal, o_orderdate date, o_orderpriority text, o_shippriority text, o_comment text, extracol text)""")
+    cur.execute("""Create index Grulez4 on orders (o_orderkey);""")
 
     cur.execute(""" Create table part(p_partkey integer, p_name text, p_mfgr text, p_brand text, p_type text, p_size integer, p_container text, p_retailprice decimal, p_comment text)""")
-    cur.execute("""Create table partsupp (ps_partkey integer, ps_suppkey integer, ps_availqty integer, ps_supplycost decimal, ps_comment text)""")
+    cur.execute("""Create index GRulez5 on part (p_partkey);""")
 
-    cur.execute("""Create table lineitem (l_orderkey integer, l_partkey integer, l_suppkey integer, l_linenumber integer, l_quantity real, l_extendedprice decimal, l_discount decimal, l_tax decimal,l_returnflag text, l_linestatus text, l_shipdate date, l_commitdate date, l_receiptdate date, l_shipinstruct text, l_shipmode text, l_comment text)""")
+    cur.execute("""Create table partsupp (ps_partkey integer, ps_suppkey integer, ps_availqty integer, ps_supplycost decimal, ps_comment text)""")
+    cur.execute("""Create index GRulez6 on partsupp (ps_partkey);""")
+
+    cur.execute("""Create table lineitem (l_orderkey integer, l_partkey integer, l_suppkey integer, l_linenumber integer, l_quantity decimal, l_extendedprice decimal, l_discount decimal, l_tax decimal,l_returnflag text, l_linestatus text, l_shipdate date, l_commitdate date, l_receiptdate date, l_shipinstruct text, l_shipmode text, l_comment text)""")
+    cur.execute("""Create index GRulez7 on lineitem (l_partkey);""")
+
+
     print "Loading the tables"
+
     startload2=time.time()
+
     cur.execute("""Copy customer from '%s' (format csv, delimiter ('|'));""" % pathcustomer)
 
     cur.execute("""Copy lineitem from '%s' (format csv, delimiter ('|'));""" % pathlineitem)
@@ -1077,9 +1126,9 @@ else:
 
     cur.execute("""Copy supplier from '%s' (format csv, delimiter ('|'));""" % pathsupplier)
     endload2=time.time()
-    difload2=endload2-startload2
+    difloading1=endload2-startload2
     print "Done loading the db"
-    print ("Time loading the tables : %s seconds" %difload2)
+    print ("Time loading the tables : %s seconds" %difloading1)
     num_times=6
     run_times1=[]
     for i in range(1,num_times):
@@ -1504,20 +1553,87 @@ else:
 #---------------------UPDATE TRY---------------------------------
 
     os.chdir(pathupdatecommit)
-    print "Current commit version is : "
-    ComValue1=os.system("git rev-parse HEAD")
+    
+    ComValue1=os.popen("git rev-parse HEAD").read()
+    print ("The current commit is : %s" %ComValue1)
     print "Updating to the new commit of Postgresql.."
     os.system("git pull https://github.com/postgres/postgres")
+    ComValue2=os.popen("git rev-parse HEAD").read()
+    print("The current commit version is %s" %ComValue2)
     print "--------------------------------------------------"
-    print "Current commit version is : "
-    ComValue2=os.system("git rev-parse HEAD")
-    #while ComValue1==ComValue2:
-        #print ("There is no new commit available, waiting for ? mins..")
-        #os.system("sleep 3m")
-        #os.system("git pull https://github.com/postgres/postgres")
-        #ComValue2=os.system("git rev-parse")
+    while ComValue1==ComValue2:
+        print ("There is no new commit available, waiting for 3 mins..")
+        os.system("sleep 3m")
+        os.system("git pull https://github.com/postgres/postgres")
+        ComValue2=os.popen("git rev-parse HEAD").read()
+
+
+
+
+    print ("Installing the new commit of PostGreSql...")
+    os.system("make -j -s")
+    os.system("make install -j -s")
     pathpostupdate=os.path.join(home,Dirvar,'bin')
     os.chdir(pathpostupdate)
+
+    print "Dropping the tables and reloading them..."
+    cur.execute("""Drop table nation;""")
+    cur.execute("""Drop table supplier;""")
+    cur.execute("""Drop table region;""")
+    cur.execute("""Drop table customer;""")
+    cur.execute("""Drop table orders;""")
+    cur.execute("""Drop table part;""")
+    cur.execute("""Drop table partsupp;""")
+    cur.execute("""Drop table lineitem;""")
+    
+    cur.execute("""Create table nation (n_nationkey integer, n_name text, n_regionkey integer, n_comment text)""")
+    cur.execute("""Create index GRulez0 on nation (n_nationkey);""")
+
+    cur.execute("""Create table supplier (s_suppkey integer, s_name text, s_address text, s_nationkey integer, s_phone text, s_acctbal decimal, s_comment text)""")
+    cur.execute("""Create index GRulez1 on supplier (s_suppkey);""")
+
+    cur.execute("""Create table region (r_regionkey integer, r_name text, r_comment text)""")
+    cur.execute("""Create index GRulez2 on region (r_regionkey);""")
+
+    cur.execute("""Create table customer (c_custkey integer,c_name text, c_address text, c_nationkey integer, c_phone text, c_acctbal decimal, c_mktsegment text, c_comment text)""")
+    cur.execute("""Create index Grulez3 on customer (c_custkey);""")
+
+    cur.execute("""Create table orders (o_orderkey integer, o_custkey integer, o_orderstatus text,o_totalprice decimal, o_orderdate date, o_orderpriority text, o_shippriority text, o_comment text, extracol text)""")
+    cur.execute("""Create index Grulez4 on orders (o_orderkey);""")
+
+    cur.execute(""" Create table part(p_partkey integer, p_name text, p_mfgr text, p_brand text, p_type text, p_size integer, p_container text, p_retailprice decimal, p_comment text)""")
+    cur.execute("""Create index GRulez5 on part (p_partkey);""")
+
+    cur.execute("""Create table partsupp (ps_partkey integer, ps_suppkey integer, ps_availqty integer, ps_supplycost decimal, ps_comment text)""")
+    cur.execute("""Create index GRulez6 on partsupp (ps_partkey);""")
+
+    cur.execute("""Create table lineitem (l_orderkey integer, l_partkey integer, l_suppkey integer, l_linenumber integer, l_quantity decimal, l_extendedprice decimal, l_discount decimal, l_tax decimal,l_returnflag text, l_linestatus text, l_shipdate date, l_commitdate date, l_receiptdate date, l_shipinstruct text, l_shipmode text, l_comment text)""")
+    cur.execute("""Create index GRulez7 on lineitem (l_partkey);""")
+
+    
+    startloading2=time.time()
+    
+    cur.execute("""Copy customer from '%s' (format csv, delimiter ('|'));""" % pathcustomer)
+
+    cur.execute("""Copy lineitem from '%s' (format csv, delimiter ('|'));""" % pathlineitem)
+
+    cur.execute("""Copy nation from '%s' (format csv, delimiter ('|'));""" % pathnation)
+
+    cur.execute("""Copy orders from '%s' (format csv, delimiter ('|'));""" % pathorders)
+
+    cur.execute("""Copy part  from '%s' (format csv, delimiter ('|'));""" % pathpart)
+
+    cur.execute("""Copy partsupp from '%s' (format csv, delimiter ('|'));""" % pathpartsupp)
+
+    cur.execute("""Copy region from '%s' (format csv, delimiter ('|'));""" % pathregion)
+
+    cur.execute("""Copy supplier from '%s' (format csv, delimiter ('|'));""" % pathsupplier)
+    endloading2=time.time()
+    difloading2=endloading2-startloading2
+    totaldifloading=difloading1-difloading2
+    print "Done loading the tables"
+    print ("Time loading the tables with the new commit: %s seconds" %difloading2)
+    print ("Difference in loading the tables from the previous version is : %s seconds" %totaldifloading)
 
     num_times=6
     run_times1b=[]
@@ -1950,214 +2066,423 @@ else:
         print "Results of the %d query for the cold run difference : %s , minimum hot run difference : %s , Maximum hot difference : %s , Average hot runs difference : %s" %((i/4)+1, listfin[i], listfin[i + 1], listfin[i + 2], listfin[i + 3])
 
 
+n_groups=4
 
-objects1=('q1 cold pre update','q1 cold after update','q1 min hot pre update','q1 min hot after update','q1 max hot pre update','q1 max hot after update','q1 avg pre update','q1 avg after update')
-y_pos1=np.arange(len(objects1))
-x_pos1=[q1_cold,q1_coldb,q1_min_hot,q1_min_hotb,q1_max_hot,q1_max_hotb,q1_avg,q1_avgb]
-plt.bar(y_pos1, x_pos1, align='center', alpha=1)
-plt.xticks(y_pos1,objects1)
-plt.title("Query 1 performance")
-plt.ylabel("Seconds")
+means_q1=(q1_cold, q1_min_hot,q1_max_hot,q1_avg)
+means_q1b=(q1_coldb,q1_min_hotb,q1_max_hotb,q1_avgb)
+fig, ax=plt.subplots()
+index=np.arange(n_groups)
+bar_width=0.35
+opacity=0.8
+rects1=plt.bar(index,means_q1,bar_width,alpha=opacity,color='blue', label='Q1 before update')
+rects2=plt.bar(index+bar_width,means_q1b,bar_width,alpha=opacity,color='green', label='Q1 after update')
+plt.xlabel('Query 1')
+plt.ylabel('Seconds')
+plt.title("Query 1 results")
+plt.xticks(index+bar_width,('Q1 cold','Q1 min hot','Q1 max hot','Q1 avg'))
+plt.legend()
+plt.tight_layout()
 plt.show()
 
 
-objects2=('q2 cold pre update','q2 cold after update','q2 min hot pre update','q2 min hot after update','q2 max hot pre update','q2 max hot after update','q2 avg pre update','q2 avg after update')
-y_pos2=np.arange(len(objects2))
-x_pos2=[q2_cold,q2_coldb,q2_min_hot,q2_min_hotb,q2_max_hot,q2_max_hotb,q2_avg,q2_avgb]
-plt.bar(y_pos2, x_pos2, align='center', alpha=1)
-plt.xticks(y_pos2,objects2)
-plt.title("Query 2 performance")
-plt.ylabel("Seconds")
-plt.show()
-
-objects3=('q3 cold pre update','q3 cold after update','q3 min hot pre update','q3 min hot after update','q3 max hot pre update','q3 max hot after update','q3 avg pre update','q3 avg after update')
-y_pos3=np.arange(len(objects3))
-x_pos3=[q3_cold,q3_coldb,q3_min_hot,q3_min_hotb,q3_max_hot,q3_max_hotb,q3_avg,q3_avgb]
-plt.bar(y_pos3, x_pos3, align='center', alpha=1)
-plt.xticks(y_pos3,objects3)
-plt.title("Query 3 performance")
-plt.ylabel("Seconds")
-plt.show()
-
-
-objects4=('q4 cold pre update','q4 cold after update','q4 min hot pre update','q4 min hot after update','q4 max hot pre update','q4 max hot after update','q4 avg pre update','q4 avg after update')
-y_pos4=np.arange(len(objects4))
-x_pos4=[q4_cold,q4_coldb,q4_min_hot,q4_min_hotb,q4_max_hot,q4_max_hotb,q4_avg,q4_avgb]
-plt.bar(y_pos4, x_pos4, align='center', alpha=1)
-plt.xticks(y_pos4,objects4)
-plt.title("Query 4 performance")
-plt.ylabel("Seconds")
+means_q2=(q2_cold, q2_min_hot,q2_max_hot,q2_avg)
+means_q2b=(q2_coldb,q2_min_hotb,q2_max_hotb,q2_avgb)
+fig, ax=plt.subplots()
+index=np.arange(n_groups)
+bar_width=0.35
+opacity=0.8
+rects1=plt.bar(index,means_q2,bar_width,alpha=opacity,color='blue', label='Q2 before update')
+rects2=plt.bar(index+bar_width,means_q2b,bar_width,alpha=opacity,color='green', label='Q2 after update')
+plt.xlabel('Query 2')
+plt.ylabel('Seconds')
+plt.title("Query 2 results")
+plt.xticks(index+bar_width,('Q2 cold','Q2 min hot','Q2 max hot','Q2 avg'))
+plt.legend()
+plt.tight_layout()
 plt.show()
 
 
-objects5=('q5 cold pre update','q5 cold after update','q5 min hot pre update','q5 min hot after update','q5 max hot pre update','q5 max hot after update','q5 avg pre update','q5 avg after update')
-y_pos5=np.arange(len(objects5))
-x_pos5=[q5_cold,q5_coldb,q5_min_hot,q5_min_hotb,q5_max_hot,q5_max_hotb,q5_avg,q5_avgb]
-plt.bar(y_pos5, x_pos5, align='center', alpha=1)
-plt.xticks(y_pos5,objects5)
-plt.title("Query 5 performance")
-plt.ylabel("Seconds")
-plt.show()
 
-objects6=('q6 cold pre update','q6 cold after update','q6 min hot pre update','q6 min hot after update','q6 max hot pre update','q6 max hot after update','q6 avg pre update','q6 avg after update')
-y_pos6=np.arange(len(objects6))
-x_pos6=[q6_cold,q6_coldb,q6_min_hot,q6_min_hotb,q6_max_hot,q6_max_hotb,q6_avg,q6_avgb]
-plt.bar(y_pos6, x_pos6, align='center', alpha=1)
-plt.xticks(y_pos6,objects6)
-plt.title("Query 6 performance")
-plt.ylabel("Seconds")
-plt.show()
-
-objects7=('q7 cold pre update','q7 cold after update','q7 min hot pre update','q7 min hot after update','q7 max hot pre update','q7 max hot after update','q7 avg pre update','q7 avg after update')
-y_pos7=np.arange(len(objects7))
-x_pos7=[q7_cold,q7_coldb,q7_min_hot,q7_min_hotb,q7_max_hot,q7_max_hotb,q7_avg,q7_avgb]
-plt.bar(y_pos7, x_pos7, align='center', alpha=1)
-plt.xticks(y_pos7,objects7)
-plt.title("Query 7 performance")
-plt.ylabel("Seconds")
-plt.show()
-
-objects8=('q8 cold pre update','q8 cold after update','q8 min hot pre update','q8 min hot after update','q8 max hot pre update','q8 max hot after update','q8 avg pre update','q8 avg after update')
-y_pos8=np.arange(len(objects8))
-x_pos8=[q8_cold,q8_coldb,q8_min_hot,q8_min_hotb,q8_max_hot,q8_max_hotb,q8_avg,q8_avgb]
-plt.bar(y_pos8, x_pos8, align='center', alpha=1)
-plt.xticks(y_pos8,objects8)
-plt.title("Query 8 performance")
-plt.ylabel("Seconds")
-plt.show()
-
-objects9=('q9 cold pre update','q9 cold after update','q9 min hot pre update','q9 min hot after update','q9 max hot pre update','q9 max hot after update','q9 avg pre update','q9 avg after update')
-y_pos9=np.arange(len(objects9))
-x_pos9=[q9_cold,q9_coldb,q9_min_hot,q9_min_hotb,q9_max_hot,q9_max_hotb,q9_avg,q9_avgb]
-plt.bar(y_pos9, x_pos9, align='center', alpha=1)
-plt.xticks(y_pos9,objects9)
-plt.title("Query 9 performance")
-plt.ylabel("Seconds")
-plt.show()
-
-objects10=('q10 cold pre update','q10 cold after update','q10 min hot pre update','q10 min hot after update','q10 max hot pre update','q10 max hot after update','q10 avg pre update','q10 avg after update')
-y_pos10=np.arange(len(objects10))
-x_pos10=[q10_cold,q10_coldb,q10_min_hot,q10_min_hotb,q10_max_hot,q10_max_hotb,q10_avg,q10_avgb]
-plt.bar(y_pos10, x_pos10, align='center', alpha=1)
-plt.xticks(y_pos10,objects10)
-plt.title("Query 10 performance")
-plt.ylabel("Seconds")
+means_q3=(q3_cold, q3_min_hot,q3_max_hot,q3_avg)
+means_q3b=(q3_coldb,q3_min_hotb,q3_max_hotb,q3_avgb)
+fig, ax=plt.subplots()
+index=np.arange(n_groups)
+bar_width=0.35
+opacity=0.8
+rects1=plt.bar(index,means_q3,bar_width,alpha=opacity,color='blue', label='Q3 before update')
+rects2=plt.bar(index+bar_width,means_q3b,bar_width,alpha=opacity,color='green', label='Q3 after update')
+plt.xlabel('Query 3')
+plt.ylabel('Seconds')
+plt.title("Query 3 results")
+plt.xticks(index+bar_width,('Q3 cold','Q3 min hot','Q3 max hot','Q3 avg'))
+plt.legend()
+plt.tight_layout()
 plt.show()
 
 
-objects11=('q11 cold pre update','q11 cold after update','q11 min hot pre update','q11 min hot after update','q11 max hot pre update','q11 max hot after update','q11 avg pre update','q11 avg after update')
-y_pos11=np.arange(len(objects11))
-x_pos11=[q11_cold,q11_coldb,q11_min_hot,q11_min_hotb,q11_max_hot,q11_max_hotb,q11_avg,q11_avgb]
-plt.bar(y_pos10, x_pos10, align='center', alpha=1)
-plt.xticks(y_pos11,objects11)
-plt.title("Query 11 performance")
-plt.ylabel("Seconds")
+means_q4=(q4_cold, q4_min_hot,q4_max_hot,q4_avg)
+means_q4b=(q4_coldb,q4_min_hotb,q4_max_hotb,q4_avgb)
+fig, ax=plt.subplots()
+index=np.arange(n_groups)
+bar_width=0.35
+opacity=0.8
+rects1=plt.bar(index,means_q4,bar_width,alpha=opacity,color='blue', label='Q4 before update')
+rects2=plt.bar(index+bar_width,means_q4b,bar_width,alpha=opacity,color='green', label='Q4 after update')
+plt.xlabel('Query 4')
+plt.ylabel('Seconds')
+plt.title("Query 4 results")
+plt.xticks(index+bar_width,('Q4 cold','Q4 min hot','Q4 max hot','Q4 avg'))
+plt.legend()
+plt.tight_layout()
 plt.show()
 
 
-objects12=('q12 cold pre update','q12 cold after update','q12 min hot pre update','q12 min hot after update','q12 max hot pre update','q12 max hot after update','q12 avg pre update','q12 avg after update')
-y_pos12=np.arange(len(objects1))
-x_pos12=[q12_cold,q12_coldb,q12_min_hot,q12_min_hotb,q12_max_hot,q12_max_hotb,q12_avg,q12_avgb]
-plt.bar(y_pos12, x_pos12, align='center', alpha=1)
-plt.xticks(y_pos12,objects12)
-plt.title("Query 12 performance")
-plt.ylabel("Seconds")
+
+means_q5=(q5_cold, q5_min_hot,q5_max_hot,q5_avg)
+means_q5b=(q5_coldb,q5_min_hotb,q5_max_hotb,q5_avgb)
+fig, ax=plt.subplots()
+index=np.arange(n_groups)
+bar_width=0.35
+opacity=0.8
+rects1=plt.bar(index,means_q5,bar_width,alpha=opacity,color='blue', label='Q5 before update')
+rects2=plt.bar(index+bar_width,means_q5b,bar_width,alpha=opacity,color='green', label='Q5 after update')
+plt.xlabel('Query 5')
+plt.ylabel('Seconds')
+plt.title("Query 5 results")
+plt.xticks(index+bar_width,('Q5 cold','Q5 min hot','Q5 max hot','Q5 avg'))
+plt.legend()
+plt.tight_layout()
+plt.show()
+
+means_q6=(q6_cold, q6_min_hot,q6_max_hot,q6_avg)
+means_q6b=(q6_coldb,q6_min_hotb,q6_max_hotb,q6_avgb)
+fig, ax=plt.subplots()
+index=np.arange(n_groups)
+bar_width=0.35
+opacity=0.8
+rects1=plt.bar(index,means_q6,bar_width,alpha=opacity,color='blue', label='Q6 before update')
+rects2=plt.bar(index+bar_width,means_q6b,bar_width,alpha=opacity,color='green', label='Q6 after update')
+plt.xlabel('Query 6')
+plt.ylabel('Seconds')
+plt.title("Query 6 results")
+plt.xticks(index+bar_width,('Q6 cold','Q6 min hot','Q6 max hot','Q6 avg'))
+plt.legend()
+plt.tight_layout()
 plt.show()
 
 
-objects13=('q13 cold pre update','q13 cold after update','q13 min hot pre update','q13 min hot after update','q13 max hot pre update','q13 max hot after update','q13 avg pre update','q13 avg after update')
-y_pos13=np.arange(len(objects1))
-x_pos13=[q13_cold,q13_coldb,q13_min_hot,q13_min_hotb,q13_max_hot,q13_max_hotb,q13_avg,q13_avgb]
-plt.bar(y_pos13, x_pos13, align='center', alpha=1)
-plt.xticks(y_pos13,objects13)
-plt.title("Query 13 performance")
-plt.ylabel("Seconds")
+means_q7=(q7_cold, q7_min_hot,q7_max_hot,q7_avg)
+means_q7b=(q7_coldb,q7_min_hotb,q7_max_hotb,q7_avgb)
+fig, ax=plt.subplots()
+index=np.arange(n_groups)
+bar_width=0.35
+opacity=0.8
+rects1=plt.bar(index,means_q7,bar_width,alpha=opacity,color='blue', label='Q7 before update')
+rects2=plt.bar(index+bar_width,means_q7b,bar_width,alpha=opacity,color='green', label='Q7 after update')
+plt.xlabel('Query 7')
+plt.ylabel('Seconds')
+plt.title("Query 7 results")
+plt.xticks(index+bar_width,('Q7 cold','Q7 min hot','Q7 max hot','Q7 avg'))
+plt.legend()
+plt.tight_layout()
 plt.show()
 
 
-objects14=('q14 cold pre update','q14 cold after update','q14 min hot pre update','q14 min hot after update','q14 max hot pre update','q14 max hot after update','q14 avg pre update','q14 avg after update')
-y_pos14=np.arange(len(objects14))
-x_pos14=[q14_cold,q14_coldb,q14_min_hot,q14_min_hotb,q14_max_hot,q14_max_hotb,q14_avg,q14_avgb]
-plt.bar(y_pos14, x_pos14, align='center', alpha=1)
-plt.xticks(y_pos14,objects14)
-plt.title("Query 14 performance")
-plt.ylabel("Seconds")
+means_q8=(q8_cold, q8_min_hot,q8_max_hot,q8_avg)
+means_q8b=(q8_coldb,q8_min_hotb,q8_max_hotb,q8_avgb)
+fig, ax=plt.subplots()
+index=np.arange(n_groups)
+bar_width=0.35
+opacity=0.8
+rects1=plt.bar(index,means_q8,bar_width,alpha=opacity,color='blue', label='Q8 before update')
+rects2=plt.bar(index+bar_width,means_q8b,bar_width,alpha=opacity,color='green', label='Q8 after update')
+plt.xlabel('Query 8')
+plt.ylabel('Seconds')
+plt.title("Query 8 results")
+plt.xticks(index+bar_width,('Q8 cold','Q8 min hot','Q8 max hot','Q8 avg'))
+plt.legend()
+plt.tight_layout()
 plt.show()
 
 
-objects15=('q15 cold pre update','q15 cold after update','q15 min hot pre update','q15 min hot after update','q15 max hot pre update','q15 max hot after update','q15 avg pre update','q15 avg after update')
-y_pos15=np.arange(len(objects1))
-x_pos15=[q15_cold,q15_coldb,q15_min_hot,q15_min_hotb,q15_max_hot,q15_max_hotb,q15_avg,q15_avgb]
-plt.bar(y_pos15, x_pos15, align='center', alpha=1)
-plt.xticks(y_pos15,objects15)
-plt.title("Query 15 performance")
-plt.ylabel("Seconds")
+means_q9=(q9_cold, q9_min_hot,q9_max_hot,q9_avg)
+means_q9b=(q9_coldb,q9_min_hotb,q9_max_hotb,q9_avgb)
+fig, ax=plt.subplots()
+index=np.arange(n_groups)
+bar_width=0.35
+opacity=0.8
+rects1=plt.bar(index,means_q9,bar_width,alpha=opacity,color='blue', label='Q9 before update')
+rects2=plt.bar(index+bar_width,means_q9b,bar_width,alpha=opacity,color='green', label='Q9 after update')
+plt.xlabel('Query 9')
+plt.ylabel('Seconds')
+plt.title("Query 9 results")
+plt.xticks(index+bar_width,('Q9 cold','Q9 min hot','Q9 max hot','Q9 avg'))
+plt.legend()
+plt.tight_layout()
 plt.show()
 
 
-objects16=('q16 cold pre update','q16 cold after update','q16 min hot pre update','q16 min hot after update','q16 max hot pre update','q16 max hot after update','q16 avg pre update','q16 avg after update')
-y_pos16=np.arange(len(objects1))
-x_pos16=[q16_cold,q16_coldb,q16_min_hot,q16_min_hotb,q16_max_hot,q16_max_hotb,q16_avg,q16_avgb]
-plt.bar(y_pos16, x_pos16, align='center', alpha=1)
-plt.xticks(y_pos16,objects16)
-plt.title("Query 16 performance")
-plt.ylabel("Seconds")
+means_q10=(q10_cold, q10_min_hot,q10_max_hot,q10_avg)
+means_q10b=(q10_coldb,q10_min_hotb,q10_max_hotb,q10_avgb)
+fig, ax=plt.subplots()
+index=np.arange(n_groups)
+bar_width=0.35
+opacity=0.8
+rects1=plt.bar(index,means_q10,bar_width,alpha=opacity,color='blue', label='Q10 before update')
+rects2=plt.bar(index+bar_width,means_q10b,bar_width,alpha=opacity,color='green', label='Q10 after update')
+plt.xlabel('Query 10')
+plt.ylabel('Seconds')
+plt.title("Query 10 results")
+plt.xticks(index+bar_width,('Q10 cold','Q10 min hot','Q10 max hot','Q10 avg'))
+plt.legend()
+plt.tight_layout()
 plt.show()
 
-objects17=('q17 cold pre update','q17 cold after update','q17 min hot pre update','q17 min hot after update','q17 max hot pre update','q17 max hot after update','q17 avg pre update','q17 avg after update')
-y_pos17=np.arange(len(objects17))
-x_pos17=[q17_cold,q17_coldb,q17_min_hot,q17_min_hotb,q17_max_hot,q17_max_hotb,q17_avg,q17_avgb]
-plt.bar(y_pos17, x_pos17, align='center', alpha=1)
-plt.xticks(y_pos17,objects17)
-plt.title("Query 17 performance")
-plt.ylabel("Seconds")
+
+
+means_q11=(q11_cold, q11_min_hot,q1_max_hot,q11_avg)
+means_q11b=(q11_coldb,q11_min_hotb,q11_max_hotb,q11_avgb)
+fig, ax=plt.subplots()
+index=np.arange(n_groups)
+bar_width=0.35
+opacity=0.8
+rects1=plt.bar(index,means_q11,bar_width,alpha=opacity,color='blue', label='Q11 before update')
+rects2=plt.bar(index+bar_width,means_q11b,bar_width,alpha=opacity,color='green', label='Q11 after update')
+plt.xlabel('Query 11')
+plt.ylabel('Seconds')
+plt.title("Query 11 results")
+plt.xticks(index+bar_width,('Q11 cold','Q11 min hot','Q11 max hot','Q11 avg'))
+plt.legend()
+plt.tight_layout()
 plt.show()
 
-objects18=('q18 cold pre update','q18 cold after update','q18 min hot pre update','q18 min hot after update','q18 max hot pre update','q18 max hot after update','q18 avg pre update','q18 avg after update')
-y_pos18=np.arange(len(objects1))
-x_pos18=[q18_cold,q18_coldb,q18_min_hot,q18_min_hotb,q18_max_hot,q18_max_hotb,q18_avg,q18_avgb]
-plt.bar(y_pos18, x_pos18, align='center', alpha=1)
-plt.xticks(y_pos18,objects18)
-plt.title("Query 18 performance")
-plt.ylabel("Seconds")
+
+means_q12=(q12_cold, q12_min_hot,q12_max_hot,q12_avg)
+means_q12b=(q12_coldb,q12_min_hotb,q12_max_hotb,q12_avgb)
+fig, ax=plt.subplots()
+index=np.arange(n_groups)
+bar_width=0.35
+opacity=0.8
+rects1=plt.bar(index,means_q2,bar_width,alpha=opacity,color='blue', label='Q12 before update')
+rects2=plt.bar(index+bar_width,means_q2b,bar_width,alpha=opacity,color='green', label='Q12 after update')
+plt.xlabel('Query 12')
+plt.ylabel('Seconds')
+plt.title("Query 12 results")
+plt.xticks(index+bar_width,('Q12 cold','Q12 min hot','Q12 max hot','Q12 avg'))
+plt.legend()
+plt.tight_layout()
 plt.show()
 
-objects19=('q19 cold pre update','q19 cold after update','q19 min hot pre update','q19 min hot after update','q19 max hot pre update','q19 max hot after update','q19 avg pre update','q19 avg after update')
-y_pos19=np.arange(len(objects19))
-x_pos19=[q19_cold,q19_coldb,q19_min_hot,q19_min_hotb,q19_max_hot,q19_max_hotb,q19_avg,q19_avgb]
-plt.bar(y_pos19, x_pos19, align='center', alpha=1)
-plt.xticks(y_pos19,objects19)
-plt.title("Query 19 performance")
-plt.ylabel("Seconds")
+
+means_q13=(q13_cold, q13_min_hot,q13_max_hot,q13_avg)
+means_q13b=(q13_coldb,q13_min_hotb,q13_max_hotb,q13_avgb)
+fig, ax=plt.subplots()
+index=np.arange(n_groups)
+bar_width=0.35
+opacity=0.8
+rects1=plt.bar(index,means_q13,bar_width,alpha=opacity,color='blue', label='Q13 before update')
+rects2=plt.bar(index+bar_width,means_q13b,bar_width,alpha=opacity,color='green', label='Q13 after update')
+plt.xlabel('Query 13')
+plt.ylabel('Seconds')
+plt.title("Query 13 results")
+plt.xticks(index+bar_width,('Q13 cold','Q13 min hot','Q13 max hot','Q13 avg'))
+plt.legend()
+plt.tight_layout()
 plt.show()
 
-objects20=('q20 cold pre update','q20 cold after update','q20 min hot pre update','q20 min hot after update','q20 max hot pre update','q20 max hot after update','q20 avg pre update','q20 avg after update')
-y_pos20=np.arange(len(objects20))
-x_pos20=[q20_cold,q20_coldb,q20_min_hot,q20_min_hotb,q20_max_hot,q20_max_hotb,q20_avg,q20_avgb]
-plt.bar(y_pos20, x_pos20, align='center', alpha=1)
-plt.xticks(y_pos20,objects20)
-plt.title("Query 20 performance")
-plt.ylabel("Seconds")
+
+means_q14=(q14_cold, q14_min_hot,q14_max_hot,q14_avg)
+means_q14b=(q14_coldb,q14_min_hotb,q14_max_hotb,q14_avgb)
+fig, ax=plt.subplots()
+index=np.arange(n_groups)
+bar_width=0.35
+opacity=0.8
+rects1=plt.bar(index,means_q14,bar_width,alpha=opacity,color='blue', label='Q14 before update')
+rects2=plt.bar(index+bar_width,means_q14b,bar_width,alpha=opacity,color='green', label='Q14 after update')
+plt.xlabel('Query 14')
+plt.ylabel('Seconds')
+plt.title("Query 14 results")
+plt.xticks(index+bar_width,('Q14 cold','Q14 min hot','Q14 max hot','Q14 avg'))
+plt.legend()
+plt.tight_layout()
 plt.show()
 
-objects21=('q21 cold pre update','q21 cold after update','q21 min hot pre update','q21 min hot after update','q21 max hot pre update','q21 max hot after update','q21 avg pre update','q21 avg after update')
-y_pos21=np.arange(len(objects21))
-x_pos21=[q21_cold,q21_coldb,q21_min_hot,q21_min_hotb,q21_max_hot,q21_max_hotb,q21_avg,q21_avgb]
-plt.bar(y_pos21, x_pos21, align='center', alpha=1)
-plt.xticks(y_pos21,objects21)
-plt.title("Query 21 performance")
-plt.ylabel("Seconds")
+
+means_q15=(q15_cold, q15_min_hot,q15_max_hot,q15_avg)
+means_q15b=(q15_coldb,q15_min_hotb,q15_max_hotb,q15_avgb)
+fig, ax=plt.subplots()
+index=np.arange(n_groups)
+bar_width=0.35
+opacity=0.8
+rects1=plt.bar(index,means_q15,bar_width,alpha=opacity,color='blue', label='Q15 before update')
+rects2=plt.bar(index+bar_width,means_q15b,bar_width,alpha=opacity,color='green', label='Q15 after update')
+plt.xlabel('Query 15')
+plt.ylabel('Seconds')
+plt.title("Query 15 results")
+plt.xticks(index+bar_width,('Q15 cold','Q15 min hot','Q15 max hot','Q15 avg'))
+plt.legend()
+plt.tight_layout()
 plt.show()
 
-objects22=('q22 cold pre update','q22 cold after update','q22 min hot pre update','q22 min hot after update','q22 max hot pre update','q22 max hot after update','q22 avg pre update','q22 avg after update')
-y_pos22=np.arange(len(objects22))
-x_pos22=[q22_cold,q22_coldb,q22_min_hot,q22_min_hotb,q22_max_hot,q22_max_hotb,q22_avg,q22_avgb]
-plt.bar(y_pos22, x_pos22, align='center', alpha=1)
-plt.xticks(y_pos22,objects22)
-plt.title("Query 22 performance")
-plt.ylabel("Seconds")
+
+means_q16=(q16_cold, q16_min_hot,q16_max_hot,q16_avg)
+means_q16b=(q16_coldb,q16_min_hotb,q16_max_hotb,q16_avgb)
+fig, ax=plt.subplots()
+index=np.arange(n_groups)
+bar_width=0.35
+opacity=0.8
+rects1=plt.bar(index,means_q2,bar_width,alpha=opacity,color='blue', label='Q16 before update')
+rects2=plt.bar(index+bar_width,means_q2b,bar_width,alpha=opacity,color='green', label='Q16 after update')
+plt.xlabel('Query 16')
+plt.ylabel('Seconds')
+plt.title("Query 16 results")
+plt.xticks(index+bar_width,('Q16 cold','Q16 min hot','Q16 max hot','Q16 avg'))
+plt.legend()
+plt.tight_layout()
 plt.show()
 
+
+means_q17=(q17_cold, q17_min_hot,q17_max_hot,q17_avg)
+means_q17b=(q17_coldb,q17_min_hotb,q17_max_hotb,q17_avgb)
+fig, ax=plt.subplots()
+index=np.arange(n_groups)
+bar_width=0.35
+opacity=0.8
+rects1=plt.bar(index,means_q17,bar_width,alpha=opacity,color='blue', label='Q17 before update')
+rects2=plt.bar(index+bar_width,means_q17b,bar_width,alpha=opacity,color='green', label='Q17 after update')
+plt.xlabel('Query 17')
+plt.ylabel('Seconds')
+plt.title("Query 17 results")
+plt.xticks(index+bar_width,('Q17 cold','Q17 min hot','Q17 max hot','Q17 avg'))
+plt.legend()
+plt.tight_layout()
+plt.show()
+
+means_q18=(q18_cold, q18_min_hot,q18_max_hot,q18_avg)
+means_q18b=(q18_coldb,q18_min_hotb,q18_max_hotb,q18_avgb)
+fig, ax=plt.subplots()
+index=np.arange(n_groups)
+bar_width=0.35
+opacity=0.8
+rects1=plt.bar(index,means_q18,bar_width,alpha=opacity,color='blue', label='Q18 before update')
+rects2=plt.bar(index+bar_width,means_q18b,bar_width,alpha=opacity,color='green', label='Q18 after update')
+plt.xlabel('Query 18')
+plt.ylabel('Seconds')
+plt.title("Query 18 results")
+plt.xticks(index+bar_width,('Q18 cold','Q18 min hot','Q18 max hot','Q18 avg'))
+plt.legend()
+plt.tight_layout()
+plt.show()
+
+
+means_q19=(q19_cold, q19_min_hot,q19_max_hot,q19_avg)
+means_q19b=(q19_coldb,q19_min_hotb,q19_max_hotb,q19_avgb)
+fig, ax=plt.subplots()
+index=np.arange(n_groups)
+bar_width=0.35
+opacity=0.8
+rects1=plt.bar(index,means_q2,bar_width,alpha=opacity,color='blue', label='Q19 before update')
+rects2=plt.bar(index+bar_width,means_q2b,bar_width,alpha=opacity,color='green', label='Q19 after update')
+plt.xlabel('Query 19')
+plt.ylabel('Seconds')
+plt.title("Query 19 results")
+plt.xticks(index+bar_width,('Q19 cold','Q19 min hot','Q19 max hot','Q19 avg'))
+plt.legend()
+plt.tight_layout()
+plt.show()
+
+means_q20=(q20_cold, q20_min_hot,q20_max_hot,q20_avg)
+means_q20b=(q20_coldb,q20_min_hotb,q20_max_hotb,q20_avgb)
+fig, ax=plt.subplots()
+index=np.arange(n_groups)
+bar_width=0.35
+opacity=0.8
+rects1=plt.bar(index,means_q20,bar_width,alpha=opacity,color='blue', label='Q20 before update')
+rects2=plt.bar(index+bar_width,means_q20b,bar_width,alpha=opacity,color='green', label='Q20 after update')
+plt.xlabel('Query 20')
+plt.ylabel('Seconds')
+plt.title("Query 20 results")
+plt.xticks(index+bar_width,('Q20 cold','Q20 min hot','Q20 max hot','Q20 avg'))
+plt.legend()
+plt.tight_layout()
+plt.show()
+
+
+means_q21=(q21_cold, q21_min_hot,q21_max_hot,q21_avg)
+means_q21b=(q21_coldb,q21_min_hotb,q21_max_hotb,q21_avgb)
+fig, ax=plt.subplots()
+index=np.arange(n_groups)
+bar_width=0.35
+opacity=0.8
+rects1=plt.bar(index,means_q2,bar_width,alpha=opacity,color='blue', label='Q21 before update')
+rects2=plt.bar(index+bar_width,means_q2b,bar_width,alpha=opacity,color='green', label='Q21 after update')
+plt.xlabel('Query 21')
+plt.ylabel('Seconds')
+plt.title("Query 21 results")
+plt.xticks(index+bar_width,('Q21 cold','Q21 min hot','Q21 max hot','Q21 avg'))
+plt.legend()
+plt.tight_layout()
+plt.show()
+
+
+means_q22=(q22_cold, q22_min_hot,q22_max_hot,q22_avg)
+means_q22b=(q22_coldb,q22_min_hotb,q22_max_hotb,q22_avgb)
+fig, ax=plt.subplots()
+index=np.arange(n_groups)
+bar_width=0.35
+opacity=0.8
+rects1=plt.bar(index,means_q2,bar_width,alpha=opacity,color='blue', label='Q22 before update')
+rects2=plt.bar(index+bar_width,means_q2b,bar_width,alpha=opacity,color='green', label='Q22 after update')
+plt.xlabel('Query 22')
+plt.ylabel('Seconds')
+plt.title("Query 22 results")
+plt.xticks(index+bar_width,('Q22 cold','Q22 min hot','Q22 max hot','Q22 avg'))
+plt.legend()
+plt.tight_layout()
+plt.show()
+
+
+
+ListQAverage=[q1_avg,q2_avg,q3_avg,q4_avg,q5_avg,q6_avg,q7_avg, q8_avg, q9_avg, q10_avg, q11_avg, q12_avg, q13_avg, q14_avg, q15_avg, q16_avg,q17_avg,q18_avg, q19_avg, q20_avg, q21_avg, q22_avg]
+ListQAverageb=[q1_avgb, q2_avgb, q3_avgb, q4_avgb, q5_avgb, q6_avgb, q7_avgb, q8_avgb, q9_avgb, q10_avgb, q11_avgb, q12_avgb, q13_avgb, q14_avgb, q14_avgb , q16_avgb, q17_avgb, q18_avgb, q19_avgb, q20_avgb, q21_avgb, q22_avgb]    
+for i in xrange(0, len(ListQAverage)):
+    ProductAvg=(ListQAverage[i]*ListQAverage[i+1])
+    break
+for i in xrange(0, len(ListQAverageb)):
+    ProductAvgb=(ListQAverageb[i]*ListQAverageb[i+1])
+    break
+root=math.pow(ProductAvg, 1/24)
+rootb=math.pow(ProductAvgb, 1/24)
+
+SizePowerAvg=(3600*Scalefactor)/root
+SizePowerAvgb=(3600*Scalefactor)/rootb
+
+ListQCold=[q1_cold,q2_cold,q3_cold,q4_cold,q5_cold,q6_cold,q7_cold, q8_cold, q9_cold, q10_cold, q11_cold, q12_cold, q13_cold, q14_cold,q15_cold, q16_cold,q17_cold,q18_cold, q19_cold, q20_cold, q21_cold, q22_cold]
+ListQColdb=[q1_coldb, q2_coldb, q3_coldb, q4_coldb, q5_coldb, q6_coldb, q7_coldb, q8_coldb, q9_coldb, q10_coldb, q11_coldb, q12_coldb, q13_coldb, q14_coldb, q15_coldb , q16_coldb, q17_coldb, q18_coldb, q19_coldb, q20_coldb, q21_coldb, q22_coldb]    
+ProductCold=prod(ListQCold)
+ProductColdb=prod(ListQColdb)
+
+rootcold=math.pow(ProductCold, 1/24)
+rootcoldb=math.pow(ProductColdb, 1/24)
+
+SizePowerCold=(3600*Scalefactor)/rootcold
+SizePowerColdb=(3600*Scalefactor)/rootcoldb
+
+means_sizepower=(SizePowerAvg, SizePowerCold)
+means_sizepowerb=(SizePowerAvgb, SizePowerColdb)
+fig, ax=plt.subplots()
+index=np.arange(2)
+bar_width=0.35
+opacity=0.8
+rects1=plt.bar(index,means_sizepower,bar_width,alpha=opacity,color='blue', label='TPC-H Power@Size before update')
+rects2=plt.bar(index+bar_width,means_sizepowerb,bar_width,alpha=opacity,color='green', label='TPC-H Power@Size after update')
+plt.xlabel('Power@Size')
+plt.ylabel('Seconds')
+plt.title("TPC-H Power@size")
+plt.xticks(index+bar_width,('Power@Size Hot Runs Average','Power@Size Cold runs'))
+plt.legend()
+plt.tight_layout()
+plt.show()
 
 cur.close()
 conn.commit()
