@@ -2476,8 +2476,8 @@ bar_width=0.35
 opacity=0.8
 rects1=plt.bar(index,means_sizepower,bar_width,alpha=opacity,color='blue', label='TPC-H Power@Size before update')
 rects2=plt.bar(index+bar_width,means_sizepowerb,bar_width,alpha=opacity,color='green', label='TPC-H Power@Size after update')
-plt.xlabel('Power@Size')
-plt.ylabel('Seconds')
+plt.xlabel('')
+plt.ylabel('')
 plt.title("TPC-H Power@size")
 plt.xticks(index+bar_width,('Power@Size Hot Runs Average','Power@Size Cold runs'))
 plt.legend()
