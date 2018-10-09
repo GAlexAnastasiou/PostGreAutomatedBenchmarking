@@ -507,6 +507,7 @@ if os.path.exists(os.path.join(home,Dirvar))==True:
             q20=end20-start20
             run_times20.append(q20)
             print ("Elapsed time for the %d run of the 20th query is %s seconds" %(i,q20))
+		
 
         q20_cold=run_times20[0]
         q20_min_hot=min(run_times20[1:])
