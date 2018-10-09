@@ -133,7 +133,7 @@ if os.path.exists(os.path.join(home,Dirvar))==True:
         q1_min_hot=min(run_times1[1:])
         q1_max_hot=max(run_times1[1:])
         q1_avg=(sum(run_times1[1:]))/(len(run_times1)-1)
-	q1_median=statistics.median(run_times1[1:])
+	 q1_median=statistics.median(run_times1[1:])
         print ("The cold run for the 1st query was: %s seconds" %q1_cold)
         print ("The fastest time for the 1st query hot runs was : %s seconds" %q1_min_hot)
         print ("The slowest time for the hot runs was : %s" %q1_max_hot)
